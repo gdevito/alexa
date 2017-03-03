@@ -1,8 +1,11 @@
 #!/usr/bin/python
 import argparse
+import boto3
 import io
 import json
 import logging
+import multiprocessing
+import operator
 import pprint
 import re
 import requests
@@ -16,7 +19,11 @@ def get_alexa_sites(rank=100):
     the table.  previous AWS Alexa api had not been working and found this
     to work nicely once read up on bs4 module'''
 
-    r = requests.get('https://en.wikipedia.org/wiki/List_of_most_popular_websites')
+    try:
+        r = requests.get('https://en.wikipedia.org/wiki/List_of_most_popular_websites')
+    except requests.exceptions.RequestException as e:
+        logging.error(e)
+        sys.exit(1)
     html = BeautifulSoup(r.content, 'lxml')
     top_sites = []
 
@@ -31,7 +38,9 @@ def get_alexa_sites(rank=100):
             if it == 0: site['co'] = txt
             elif it == 1: site['url'] = txt
             elif it == 2: site['rank'] = txt
-            elif it == 3: site['prev_rank'] = txt
+            elif it == 3:
+                site['prev_rank'] = txt
+                #site['rank_hop'] = int(site['rank']) - int(site['prev_rank'])
             elif it == 4:
                 site['type'] = txt
             #refs = td.find_all('a', href=True)
@@ -53,7 +62,7 @@ def get_words(url):
     except requests.exceptions.RequestException as e:
         logging.error(e)
         sys.exit(1)
-    html = BeautifulSoup(r.content, 'html.parser')
+    html = BeautifulSoup(r.content, 'lxml')
     #text = html.findAll(text=True)
     refs = html.find_all('a')
     words = []
@@ -80,24 +89,55 @@ def main():
     parser.add_argument('-w', '--words', dest='words', action='store_true', default=False, help='Calculate word counts')
     args = parser.parse_args()
 
+    metrics = {}
+
+    start = time.time()
     if args.rank:
         sites = get_alexa_sites(args.rank)
     else:
         sites = get_alexa_sites()
         logging.info('Default get 100')
 
+    metrics['t_sites'] = start - time.time()
+    metrics['num_sites'] = len(sites)
+    t_num = 0
+    t_get_words = 0
+    num_words = 0
+
     if args.words:
         for site in sites:
             logging.info(site)
             start = time.time()
-            words, len = get_words(site['url'])
-            site['wc'] = len
+            # use thread pool to parallelize calls
+            words, num = get_words(site['url'])
+            site['wc'] = num
+            num_words += num
             site['words'] = words
-            site['time'] = start - time.time()
+            site['time'] = time.time() - start
+            t_get_words += site['time']
             logging.info('Time: ', site['time'])
-        with io.open('word_counts.txt', 'w', encoding='utf-8') as f:
+        with io.open('results/word_counts.txt', 'w', encoding='utf-8') as f:
             logging.info('Writing json out to word_counts.txt')
             f.write(unicode(json.dumps(sites, indent=4, ensure_ascii=False)))
+
+    # rollup metrics
+    metrics['avg_wc'] = num_words / metrics['num_sites']
+    metrics['t_lookup'] = t_get_words
+    metrics['t_avg_lookup'] = t_get_words / metrics['num_sites']
+    metrics['t_total'] = metrics['t_sites'] + metrics['t_lookup']
+    with io.open('results/metrics.txt', 'w', encoding='utf-8') as f:
+        logging.info('Writing metrics to json')
+        f.write(unicode(json.dumps(metrics, indent=4)))
+
+    by_wc = sorted(sites, key=operator.itemgetter('wc'))
+    #by_rank_jump = sorted(sites, key=(operator.itemgetter('rank_hop')))
+    
+    top = 10 if len(sites) >= 10 else len(sites)
+    with io.open('results/top_tens.txt', 'w', encoding='utf-8') as f:
+        logging.info('Writing top tens')
+        f.write(unicode(json.dumps(by_wc[:top])))
+        #f.write(unicode(json.dumps(by_rank_jump[:top])))
+                          
 
 if __name__ == "__main__":
     main()

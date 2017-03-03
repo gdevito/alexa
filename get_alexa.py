@@ -1,12 +1,14 @@
 #!/usr/bin/python
 
 import argparse
+import boto3
 import configparser
 import base64
 import hashlib
 import hmac
 import json
 import logging
+import os
 import pprint
 import re
 import requests
@@ -170,10 +172,10 @@ pref = 'http://www.'
 
 def main():
 
-    cfg = ConfigParser()
-    cfg.read(os.path.expanduser('~/.aws'))
-    username = cfg.get('aws', 'username')
-    key = cfg.get('aws', 'api_key'))
+    cfg = configparser.ConfigParser()
+    cfg.read(os.path.expanduser('~/.aws/credentials'))
+    username = cfg.get('default', 'aws_access_key_id')
+    key = cfg.get('default', 'aws_secret_access_key')
 
     logging.basicConfig(filename='alexa_ranks.log', level=logging.INFO)
 
