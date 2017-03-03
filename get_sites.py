@@ -116,9 +116,9 @@ def main():
             site['time'] = time.time() - start
             t_get_words += site['time']
             logging.info('Time: ', site['time'])
-        with io.open('results/word_counts.txt', 'w', encoding='utf-8') as f:
-            logging.info('Writing json out to word_counts.txt')
-            f.write(unicode(json.dumps(sites, indent=4, ensure_ascii=False)))
+            with io.open('results/word_counts.txt', 'a', encoding='utf-8') as f:
+                logging.info('Writing json out to word_counts.txt')
+                f.write(unicode(json.dumps(site, indent=4, ensure_ascii=False)))
 
     # rollup metrics
     metrics['avg_wc'] = num_words / metrics['num_sites']
