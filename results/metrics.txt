@@ -1,7 +1,11 @@
 {
-    "t_total_real": 36.76720094680786, 
+    "t_sites": 1.0767199993133545, 
+    "most_common_type": [
+        "Search engine", 
+        24
+    ], 
+    "t_total_real": 61.81477093696594, 
     "avg_wc": 266, 
-    "num_sites": 100, 
-    "t_lookups": 130.89806985855103, 
-    "t_sites": 1.4845099449157715
+    "t_lookups": 168.26677775382996, 
+    "num_sites": 100
 }

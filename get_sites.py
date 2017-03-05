@@ -14,6 +14,7 @@ import sys
 import time
 
 from bs4 import BeautifulSoup
+from collections import Counter
 
 def get_alexa_sites(rank=100):
     ''' parse wiki table for top rank and collect additional info from 
@@ -76,7 +77,23 @@ def get_retry(kwargs):
     return result
 
 def get_words(url):
+    '''
+    Taking the url, acquired from get_alexa_sites()
+
+    GET the URL, and parse the text out of the body of
+    raw html using parsing libraries
+
+    Store the words parsed and return response
     
+    :arg url: Input url in format like <business>.com specifically
+    :type url: string
+
+    :return response: Dict of response keys, combined will build a 
+    list of most highly ranked sites.  
+    :type response: {'words': words, 'wc':len(words), 'time':time_taken,
+                     'url':url, 'header':headers}
+    '''
+
     response = None
     logging.info('GET:words ' + url)
     start = time.time()
@@ -91,12 +108,13 @@ def get_words(url):
     for ref in refs:
         strings = ref.get_text().encode('utf-8').split()
         for string in strings:
+            #string = re.sub('[^a-zA-Z0-9-_*.]', '', string)
             re.compile('\w+').findall(string)
             words.append(string)
     logging.info('URL: '+url)
     logging.info('LEN: '+str(len(words)))
     t_get = time.time() - start
-    response = {'words':words, 'wc':len(words), 'time':t_get, 'url':url}
+    response = {'words':words, 'wc':len(words), 'time':t_get, 'url':url, 'header':r.headers}
 
     #logging.info(response)
     return response
@@ -143,18 +161,35 @@ def main():
     metrics['avg_wc'] = sum(site['wc'] for site in results) / len(sites)
     metrics['t_lookups'] = sum(site['time'] for site in results)
     metrics['t_total_real'] = metrics['t_sites'] + time.time() - start
+    metrics['most_common_type'] = Counter(d['type'] for d in sites).most_common(1)[0]
     with io.open('results/metrics.txt', 'w', encoding='utf-8') as f:
         logging.info('Writing metrics to json')
         f.write(unicode(json.dumps(metrics, indent=4)))
 
-    by_wc = sorted(results, key=operator.itemgetter('wc'))
+    # clean headers and words out of results for top wc
+    by_wc = [{'url':d['url'], 'wc':d['wc']} for d in sorted(results, key=operator.itemgetter('wc'), reverse=True)]
     by_rank_jump = sorted(sites, key=operator.itemgetter('rank_jmp'), reverse=True)
+    cache_rules = []
+    for r in results:
+        try:
+            cache_rules.append({'url':r['url'], 'Cache-Control':r['header']['Cache-Control'], 'lencc':len(r['header']['Cache-Control'].split(', '))})
+        except KeyError, e:
+            logging.error(e)
+            logging.error(r['header'])
+    try:
+        by_cache_rules = sorted(d for d in sorted(cache_rules, key=operator.itemgetter('lencc'), reverse=True))
+    except KeyError, e:
+        logging.error(e)
 
     with io.open('results/top_tens.txt', 'w', encoding='utf-8') as f:
         logging.info('Writing top tens')
+        f.write(unicode('Alexa Ranked Sites Ordered by Word Count'))
         f.write(unicode(json.dumps(by_wc, indent=4)))
+        f.write(unicode('Alexa Ranked Sites Ordered by Jump in Ranking from Previous Year'))
         f.write(unicode(json.dumps(by_rank_jump, indent=4)))
-                          
+        f.write(unicode('Alexa Ranked Sites Ordered by Number of HTTP Cache-Control Rules'))
+        f.write(unicode(json.dumps(by_cache_rules, indent=4)))
+
 if __name__ == "__main__":
     main()
 
