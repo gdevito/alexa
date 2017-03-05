@@ -177,18 +177,20 @@ def main():
             logging.error(e)
             logging.error(r['header'])
     try:
-        by_cache_rules = sorted(d for d in sorted(cache_rules, key=operator.itemgetter('lencc'), reverse=True))
+        logging.info('Sort Cache Rules')
+        by_cache_rules = sorted(cache_rules, key=operator.itemgetter('lencc'), reverse=True)
     except KeyError, e:
         logging.error(e)
 
+    top = 10 if len(sites) > 10 else len(sites)
     with io.open('results/top_tens.txt', 'w', encoding='utf-8') as f:
         logging.info('Writing top tens')
         f.write(unicode('Alexa Ranked Sites Ordered by Word Count'))
-        f.write(unicode(json.dumps(by_wc, indent=4)))
+        f.write(unicode(json.dumps(by_wc[:top], indent=4)))
         f.write(unicode('Alexa Ranked Sites Ordered by Jump in Ranking from Previous Year'))
-        f.write(unicode(json.dumps(by_rank_jump, indent=4)))
+        f.write(unicode(json.dumps(by_rank_jump[:top], indent=4)))
         f.write(unicode('Alexa Ranked Sites Ordered by Number of HTTP Cache-Control Rules'))
-        f.write(unicode(json.dumps(by_cache_rules, indent=4)))
+        f.write(unicode(json.dumps(by_cache_rules[:top], indent=4)))
 
 if __name__ == "__main__":
     main()
